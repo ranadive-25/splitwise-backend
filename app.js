@@ -13,12 +13,6 @@ app.use('/expenses', expenseRoutes);
 app.use('/', settlementRoutes);
 
 
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
 catch (err) {
   console.error(err); // ✅ log to Render logs
   res.status(500).json({ error: err.message || "Unknown server error" });
