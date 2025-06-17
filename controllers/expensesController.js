@@ -87,10 +87,7 @@ exports.updateExpense = async (req, res) => {
     }
 
     const payerId = await getOrCreatePerson(paid_by);
-    await db.query(
-  'INSERT INTO expenses (amount, description, paid_by, split_type) VALUES ($1, $2, $3, $4)',
-  [amountPaise, description, payerId.toString(), split_type]
-);
+    
 
     const result = await db.query(
       'UPDATE expenses SET amount = $1, description = $2, paid_by = $3 WHERE id = $4 RETURNING *',
