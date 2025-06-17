@@ -1,13 +1,13 @@
 const db = require('../db');
 const { rupeesToPaise, paiseToRupees } = require('../utils/money');
 
-const payerId = await getOrCreatePerson(paid_by);
+async function getOrCreatePerson(name) {
+  const existing = await db.query('SELECT id FROM people WHERE name = $1', [name]);
+  if (existing.rows.length > 0) return existing.rows[0].id;
 
-// convert ID to string if you're storing paid_by as text
-await db.query(
-  'INSERT INTO expenses (amount, description, paid_by, split_type) VALUES ($1, $2, $3, $4)',
-  [amountPaise, description, payerId.toString(), split_type]
-);
+  const insert = await db.query('INSERT INTO people (name) VALUES ($1) RETURNING id', [name]);
+  return insert.rows[0].id;
+}
 
 
 exports.addExpense = async (req, res) => {
@@ -20,6 +20,10 @@ exports.addExpense = async (req, res) => {
 
     const amountRupees = parseFloat(amount);
     const payerId = await getOrCreatePerson(paid_by);
+    await db.query(
+  'INSERT INTO expenses (amount, description, paid_by, split_type) VALUES ($1, $2, $3, $4)',
+  [amountPaise, description, payerId.toString(), split_type]
+);
 
     let totalShare = 0;
     const sharesRupees = {};
@@ -91,6 +95,10 @@ exports.updateExpense = async (req, res) => {
     }
 
     const payerId = await getOrCreatePerson(paid_by);
+    await db.query(
+  'INSERT INTO expenses (amount, description, paid_by, split_type) VALUES ($1, $2, $3, $4)',
+  [amountPaise, description, payerId.toString(), split_type]
+);
 
     const result = await db.query(
       'UPDATE expenses SET amount = $1, description = $2, paid_by = $3 WHERE id = $4 RETURNING *',
