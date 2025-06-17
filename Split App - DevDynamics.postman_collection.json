@@ -40,9 +40,33 @@
 		},
 		{
 			"name": "New Request",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
 			"request": {
 				"method": "GET",
-				"header": []
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n            \"amount\": 750,\r\n            \"description\": \"Updated Dinner\",\r\n            \"paid_by\": \"Shantanu\"\r\n        }",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://split-apps-backend.onrender.com/expenses",
+					"protocol": "https",
+					"host": [
+						"split-apps-backend",
+						"onrender",
+						"com"
+					],
+					"path": [
+						"expenses"
+					]
+				}
 			},
 			"response": []
 		},
