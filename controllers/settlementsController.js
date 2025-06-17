@@ -13,9 +13,6 @@ exports.getPeople = async (req, res) => {
 };
 
 
-const db = require('../db');
-const { paiseToRupees } = require('../utils/money');
-
 exports.getBalances = async (req, res) => {
   try {
     // 1. Get total paid by each person
