@@ -13,13 +13,16 @@ exports.getPeople = async (req, res) => {
 };
 
 
+const db = require('../db');
+const { paiseToRupees } = require('../utils/money');
+
 exports.getBalances = async (req, res) => {
   try {
     // 1. Get total paid by each person
     const paidQuery = await db.query(`
       SELECT p.name, COALESCE(SUM(e.amount), 0) AS total_paid
       FROM people p
-      LEFT JOIN expenses e ON p.id = e.paid_by
+      LEFT JOIN expenses e ON CAST(p.id AS TEXT) = CAST(e.paid_by AS TEXT)
       GROUP BY p.name
     `);
 
@@ -32,11 +35,11 @@ exports.getBalances = async (req, res) => {
     `);
 
     const paidMap = Object.fromEntries(
-      paidQuery.rows.map(r => [r.name, parseInt(r.total_paid)])
+      paidQuery.rows.map(r => [r.name, parseFloat(r.total_paid)])
     );
 
     const shareMap = Object.fromEntries(
-      shareQuery.rows.map(r => [r.name, parseInt(r.total_share)])
+      shareQuery.rows.map(r => [r.name, parseFloat(r.total_share)])
     );
 
     const allPeople = new Set([...Object.keys(paidMap), ...Object.keys(shareMap)]);
