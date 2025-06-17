@@ -20,10 +20,6 @@ exports.addExpense = async (req, res) => {
 
     const amountRupees = parseFloat(amount);
     const payerId = await getOrCreatePerson(paid_by);
-    await db.query(
-  'INSERT INTO expenses (amount, description, paid_by, split_type) VALUES ($1, $2, $3, $4)',
-  [amountPaise, description, payerId.toString(), split_type]
-);
 
     let totalShare = 0;
     const sharesRupees = {};
@@ -47,10 +43,6 @@ exports.addExpense = async (req, res) => {
 
     for (const [name, share] of Object.entries(sharesRupees)) {
       const personId = await getOrCreatePerson(name);
-      await db.query(
-        'INSERT INTO expense_shares (expense_id, person_id, share) VALUES ($1, $2, $3)',
-        [expenseId, personId, share]
-      );
     }
 
     res.json({ success: true, message: "Expense added", expense_id: expenseId });
