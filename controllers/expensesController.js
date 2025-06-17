@@ -1,15 +1,13 @@
 const db = require('../db');
 const { rupeesToPaise, paiseToRupees } = require('../utils/money');
 
-async function getOrCreatePerson(name) {
-  const existing = await db.query('SELECT id FROM people WHERE name = $1', [name]);
-  if (existing.rows.length > 0) return existing.rows[0].id;
+const payerId = await getOrCreatePerson(paid_by);
 
-  const insert = await db.query('INSERT INTO people (name) VALUES ($1) RETURNING id', [name]);
-  return insert.rows[0].id;
-}
-
-
+// convert ID to string if you're storing paid_by as text
+await db.query(
+  'INSERT INTO expenses (amount, description, paid_by, split_type) VALUES ($1, $2, $3, $4)',
+  [amountPaise, description, payerId.toString(), split_type]
+);
 
 
 exports.addExpense = async (req, res) => {
