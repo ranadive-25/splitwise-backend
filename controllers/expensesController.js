@@ -52,10 +52,11 @@ exports.addExpense = async (req, res) => {
     }
 
     res.json({ success: true, message: "Expense added", expense_id: expenseId });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+  }  catch (err) {
+    console.error(err); // ✅ Log error to console (shows in Render logs)
+    res.status(500).json({ error: err.message || "Unknown server error" });
   }
+
 };
 
 
