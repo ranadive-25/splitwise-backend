@@ -36,7 +36,7 @@ exports.addExpense = async (req, res) => {
 
     const result = await db.query(
       'INSERT INTO expenses (amount, description, paid_by, split_type) VALUES ($1, $2, $3, $4) RETURNING id',
-      [amountRupees, payerId, payerId, split_type]  // Ensure paid_by is stored as INTEGER
+      [amountRupees, payerId, payerId, split_type] 
     );
 
     const expenseId = result.rows[0].id;
