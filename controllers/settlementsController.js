@@ -2,6 +2,7 @@ const db = require('../db');
 
 const { paiseToRupees } = require('../utils/money');
 
+// Get People names
 exports.getPeople = async (req, res) => {
   try {
     const result = await db.query('SELECT name FROM people ORDER BY name');
@@ -13,6 +14,7 @@ exports.getPeople = async (req, res) => {
 };
 
 
+// Get balance amounts of all people
 exports.getBalances = async (req, res) => {
   try {
     // 1. Get total paid by each person
@@ -62,6 +64,7 @@ exports.getBalances = async (req, res) => {
   }
 };
 
+// Get Settlement data
 exports.getSettlements = async (req, res) => {
   try {
     // Get net balances first
