@@ -12,8 +12,7 @@ const settlementRoutes = require('./routes/settlements');
 app.use('/expenses', expenseRoutes);
 app.use('/', settlementRoutes);
 
-
-catch (err) {
-  console.error(err); // ✅ log to Render logs
-  res.status(500).json({ error: err.message || "Unknown server error" });
-}
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
