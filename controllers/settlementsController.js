@@ -29,23 +29,20 @@ exports.getBalances = async (req, res) => {
       GROUP BY p.id
     `);
 
-    const shareMap = Object.fromEntries(
-      shareQuery.rows.map(r => [r.id, parseFloat(r.total_share)])
-    );
+    const shareMap = {};
+    for (const s of shareQuery.rows) {
+      shareMap[s.id] = parseInt(s.total_share); // still in paise
+    }
 
     const balances = paidQuery.rows.map(row => {
-      const paid = parseFloat(row.total_paid);
-      const owed = shareMap[row.id] || 0;
-
-      const paidR = paiseToRupees(paid);
-      const owedR = paiseToRupees(owed);
-      const balanceR = paiseToRupees(paid - owed);
+      const paidPaise = parseInt(row.total_paid);
+      const owedPaise = shareMap[row.id] || 0;
 
       return {
         name: row.name,
-        paid: paidR,
-        owed: owedR,
-        balance: balanceR
+        paid: paiseToRupees(paidPaise),
+        owed: paiseToRupees(owedPaise),
+        balance: paiseToRupees(paidPaise - owedPaise)
       };
     });
 
