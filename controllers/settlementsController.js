@@ -23,16 +23,21 @@ exports.getBalances = async (req, res) => {
     `);
 
     const shareQuery = await db.query(`
-      SELECT p.id, p.name, COALESCE(SUM(s.share), 0) AS total_share
+      SELECT p.id, COALESCE(SUM(s.share), 0) AS total_share
       FROM people p
       LEFT JOIN expense_shares s ON p.id = s.person_id
       GROUP BY p.id
     `);
 
+    // ✅ Map share data by person ID
+    const shareMap = {};
+    for (const s of shareQuery.rows) {
+      shareMap[s.id] = parseFloat(s.total_share);
+    }
+
     const balances = paidQuery.rows.map(row => {
-      const share = shareQuery.rows.find(s => s.id === row.id);
       const paid = parseFloat(row.total_paid);
-      const owed = share ? parseFloat(share.total_share) : 0;
+      const owed = shareMap[row.id] || 0;
 
       return {
         name: row.name,
