@@ -1,5 +1,4 @@
 const db = require('../db');
-const { rupeesToPaise, paiseToRupees } = require('../utils/money');
 
 // Helper to get person ID from name
 async function getPersonId(name) {
@@ -18,19 +17,19 @@ exports.addRecurringExpense = async (req, res) => {
     }
 
     const paidById = await getPersonId(paid_by);
-    const amountPaise = rupeesToPaise(parseFloat(amount));
+    const amountRupees = parseFloat(amount);
 
     const result = await db.query(
       `INSERT INTO recurring_expenses (amount, description, paid_by, split_type, shares, frequency)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [amountPaise, description, paidById, split_type, JSON.stringify(shares), frequency]
+      [amountRupees, description, paidById, split_type, JSON.stringify(shares), frequency]
     );
 
     res.json({
       success: true,
       recurring: {
         ...result.rows[0],
-        amount: paiseToRupees(result.rows[0].amount),
+        amount: amountRupees,
         shares: shares
       }
     });
@@ -52,7 +51,7 @@ exports.getRecurringExpenses = async (req, res) => {
 
     const recurring = result.rows.map(row => ({
       id: row.id,
-      amount: paiseToRupees(row.amount),
+      amount: parseFloat(row.amount),
       description: row.description,
       paid_by: row.paid_by_name,
       split_type: row.split_type,
@@ -86,11 +85,11 @@ exports.runRecurringExpenses = async (req, res) => {
 
       for (const [name, value] of Object.entries(shares)) {
         const personId = await getPersonId(name);
-        const sharePaise = rupeesToPaise(parseFloat(value)); // Convert to paise here
+        const shareAmount = parseFloat(value); // already in rupees
 
         await db.query(
           'INSERT INTO expense_shares (expense_id, person_id, share) VALUES ($1, $2, $3)',
-          [expenseId, personId, sharePaise]
+          [expenseId, personId, shareAmount]
         );
       }
     }
