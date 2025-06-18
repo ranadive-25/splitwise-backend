@@ -108,26 +108,35 @@ exports.updateExpense = async (req, res) => {
     const { amount, description, paid_by } = req.body;
 
     if (!amount || !description || !paid_by) {
-      return res.status(400).json({ message: 'All fields required' });
+      return res.status(400).json({ message: "All fields required" });
     }
 
-    const payerId = await getOrCreatePerson(paid_by);
+    const payerRes = await db.query('SELECT id FROM people WHERE name = $1', [paid_by]);
+    if (payerRes.rows.length === 0) {
+      return res.status(400).json({ message: 'Payer not found' });
+    }
+    const payerId = payerRes.rows[0].id;
+
+    const amountPaise = Math.round(parseFloat(amount) * 100);
+
     const result = await db.query(
       'UPDATE expenses SET amount = $1, description = $2, paid_by = $3 WHERE id = $4 RETURNING *',
-      [rupeesToPaise(parseFloat(amount)), description, payerId, id]
+      [amountPaise, description, payerId, id]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Expense not found' });
+      return res.status(404).json({ message: "Expense not found" });
     }
 
-    res.json({ success: true, message: 'Expense updated', data: result.rows[0] });
+    const updated = result.rows[0];
+    updated.amount = paiseToRupees(updated.amount); // ✅ Convert back to rupees
+
+    res.json({ success: true, message: "Expense updated", data: updated });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
-
 // Delete Expense
 exports.deleteExpense = async (req, res) => {
   try {
