@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const recurringController = require('../controllers/recurringController');
+const controller = require('../controllers/recurringController'); // ✅ THIS was missing
 
-router.post('/', recurringController.addRecurringExpense);
-router.get('/', recurringController.getRecurringExpenses);
-router.post('/run', recurringController.runRecurringExpenses);
+// Existing routes
+router.post('/', controller.addRecurringExpense);
+router.get('/', controller.getRecurringExpenses);
+router.post('/run', controller.runRecurringExpenses);
 
+// ✅ Newly added PUT and DELETE
 router.put('/:id', controller.updateRecurringExpense);
 router.delete('/:id', controller.deleteRecurringExpense);
 
