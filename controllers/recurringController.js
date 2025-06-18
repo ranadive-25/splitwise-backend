@@ -100,3 +100,58 @@ exports.runRecurringExpenses = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.updateRecurringExpense = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { amount, description, paid_by, split_type, shares, frequency } = req.body;
+
+    if (!amount || !description || !paid_by || !split_type || !shares || !frequency) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    const paidBy = await db.query('SELECT id FROM people WHERE name = $1', [paid_by]);
+    if (paidBy.rows.length === 0) return res.status(400).json({ message: 'Payer not found' });
+
+    const updated = await db.query(
+      `UPDATE recurring_expenses
+       SET amount = $1, description = $2, paid_by = $3, split_type = $4, shares = $5, frequency = $6
+       WHERE id = $7 RETURNING *`,
+      [
+        rupeesToPaise(parseFloat(amount)),
+        description,
+        paidBy.rows[0].id,
+        split_type,
+        JSON.stringify(shares),
+        frequency,
+        id
+      ]
+    );
+
+    if (updated.rows.length === 0)
+      return res.status(404).json({ message: 'Recurring expense not found' });
+
+    res.json({ message: 'Recurring expense updated', updated: updated.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+exports.deleteRecurringExpense = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const result = await db.query('DELETE FROM recurring_expenses WHERE id = $1 RETURNING *', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Recurring expense not found' });
+    }
+
+    res.json({ message: 'Recurring expense deleted', deleted: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
