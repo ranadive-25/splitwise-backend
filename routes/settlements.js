@@ -4,6 +4,7 @@ const settlementsController = require('../controllers/settlementsController');
 
 // List all people
 router.get('/people', settlementsController.getPeople);
+router.post('/people', settlementsController.addPerson);
 
 // Get net balances (how much each person owes or is owed)
 router.get('/balances', settlementsController.getBalances);
