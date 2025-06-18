@@ -1,5 +1,4 @@
 const db = require('../db');
-const { rupeesToPaise, paiseToRupees } = require('../utils/money');
 
 async function getOrCreatePerson(name) {
   const existing = await db.query('SELECT id FROM people WHERE name = $1', [name]);
@@ -59,7 +58,7 @@ exports.addExpense = async (req, res) => {
 
     const result = await db.query(
       'INSERT INTO expenses (amount, description, paid_by, split_type) VALUES ($1, $2, $3, $4) RETURNING id',
-      [rupeesToPaise(amountRupees), description, payerId, split_type]
+      [amountRupees, description, payerId, split_type]
     );
 
     const expenseId = result.rows[0].id;
@@ -68,7 +67,7 @@ exports.addExpense = async (req, res) => {
       const personId = await getOrCreatePerson(name);
       await db.query(
         'INSERT INTO expense_shares (expense_id, person_id, share) VALUES ($1, $2, $3)',
-        [expenseId, personId, rupeesToPaise(share)]
+        [expenseId, personId, share]
       );
     }
 
@@ -89,12 +88,7 @@ exports.getExpenses = async (req, res) => {
       ORDER BY e.created_at DESC
     `);
 
-    const expenses = result.rows.map(row => ({
-      ...row,
-      amount: paiseToRupees(row.amount)
-    }));
-
-    res.json(expenses);
+    res.json(result.rows); // No conversion needed
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -117,21 +111,18 @@ exports.updateExpense = async (req, res) => {
     }
 
     const payerId = payerRes.rows[0].id;
-    const amountPaise = rupeesToPaise(parseFloat(amount));
+    const amountRupees = parseFloat(amount);
 
     const result = await db.query(
       'UPDATE expenses SET amount = $1, description = $2, paid_by = $3 WHERE id = $4 RETURNING *',
-      [amountPaise, description, payerId, id]
+      [amountRupees, description, payerId, id]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Expense not found" });
     }
 
-    const updated = result.rows[0];
-    updated.amount = paiseToRupees(updated.amount); // Convert back to rupees
-
-    res.json({ success: true, message: "Expense updated", data: updated });
+    res.json({ success: true, message: "Expense updated", data: result.rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
