@@ -130,3 +130,27 @@ exports.settleUp = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.addPerson = async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ message: 'Name is required and must be a string' });
+    }
+
+    // Check if person already exists
+    const existing = await db.query('SELECT id FROM people WHERE name = $1', [name]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ message: 'Person already exists' });
+    }
+
+    // Insert new person
+    const result = await db.query('INSERT INTO people (name) VALUES ($1) RETURNING id', [name]);
+    res.status(201).json({ message: 'Person added', id: result.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
