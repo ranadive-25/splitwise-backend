@@ -1,5 +1,4 @@
 const db = require('../db');
-const { paiseToRupees, rupeesToPaise } = require('../utils/money');
 
 // Get all people names
 exports.getPeople = async (req, res) => {
@@ -31,18 +30,18 @@ exports.getBalances = async (req, res) => {
 
     const shareMap = {};
     for (const s of shareQuery.rows) {
-      shareMap[s.id] = parseInt(s.total_share); // still in paise
+      shareMap[s.id] = parseFloat(s.total_share);
     }
 
     const balances = paidQuery.rows.map(row => {
-      const paidPaise = parseInt(row.total_paid);
-      const owedPaise = shareMap[row.id] || 0;
+      const paid = parseFloat(row.total_paid);
+      const owed = shareMap[row.id] || 0;
 
       return {
         name: row.name,
-        paid: paiseToRupees(paidPaise),
-        owed: paiseToRupees(owedPaise),
-        balance: paiseToRupees(paidPaise - owedPaise)
+        paid: paid.toFixed(2),
+        owed: owed.toFixed(2),
+        balance: (paid - owed).toFixed(2)
       };
     });
 
@@ -68,7 +67,7 @@ exports.getSettlements = async (req, res) => {
 
     let balances = balancesRes.rows.map(row => ({
       name: row.name,
-      balance: parseInt(row.total_paid) - parseInt(row.total_share)
+      balance: parseFloat(row.total_paid) - parseFloat(row.total_share)
     }));
 
     let creditors = balances.filter(b => b.balance > 0).sort((a, b) => b.balance - a.balance);
@@ -82,19 +81,19 @@ exports.getSettlements = async (req, res) => {
       const creditor = creditors[j];
       const amount = Math.min(-debtor.balance, creditor.balance);
 
-      if (amount > 0) {
+      if (amount > 0.01) {
         transactions.push({
           from: debtor.name,
           to: creditor.name,
-          amount: paiseToRupees(amount)
+          amount: amount.toFixed(2)
         });
 
         debtor.balance += amount;
         creditor.balance -= amount;
       }
 
-      if (Math.abs(debtor.balance) < 1) i++;
-      if (Math.abs(creditor.balance) < 1) j++;
+      if (Math.abs(debtor.balance) < 0.01) i++;
+      if (Math.abs(creditor.balance) < 0.01) j++;
     }
 
     res.json({ transactions });
@@ -122,12 +121,11 @@ exports.settleUp = async (req, res) => {
 
     const payerId = payerRes.rows[0].id;
     const receiverId = receiverRes.rows[0].id;
-    const amountPaise = rupeesToPaise(parseFloat(amount));
 
     await db.query(`
       INSERT INTO settlements (payer_id, receiver_id, amount, settled_at)
       VALUES ($1, $2, $3, NOW())
-    `, [payerId, receiverId, amountPaise]);
+    `, [payerId, receiverId, parseFloat(amount)]);
 
     res.json({ success: true, message: 'Settlement recorded' });
   } catch (err) {
