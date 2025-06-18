@@ -12,7 +12,7 @@ exports.getPeople = async (req, res) => {
   }
 };
 
-// Calculate net balances (paid - owed)
+// Calculate net balances (paid - owed) in rupees
 exports.getBalances = async (req, res) => {
   try {
     const paidQuery = await db.query(`
@@ -33,6 +33,7 @@ exports.getBalances = async (req, res) => {
       const share = shareQuery.rows.find(s => s.id === row.id);
       const paid = parseFloat(row.total_paid);
       const owed = share ? parseFloat(share.total_share) : 0;
+
       return {
         name: row.name,
         paid: paiseToRupees(paid),
@@ -131,6 +132,7 @@ exports.settleUp = async (req, res) => {
   }
 };
 
+// Add new person
 exports.addPerson = async (req, res) => {
   try {
     const { name } = req.body;
@@ -139,13 +141,11 @@ exports.addPerson = async (req, res) => {
       return res.status(400).json({ message: 'Name is required and must be a string' });
     }
 
-    // Check if person already exists
     const existing = await db.query('SELECT id FROM people WHERE name = $1', [name]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ message: 'Person already exists' });
     }
 
-    // Insert new person
     const result = await db.query('INSERT INTO people (name) VALUES ($1) RETURNING id', [name]);
     res.status(201).json({ message: 'Person added', id: result.rows[0].id });
   } catch (err) {
@@ -153,4 +153,3 @@ exports.addPerson = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
