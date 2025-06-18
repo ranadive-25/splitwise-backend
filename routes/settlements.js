@@ -1,9 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { getPeople, getBalances, getSettlements } = require('../controllers/settlementsController');
+const settlementsController = require('../controllers/settlementsController');
 
-router.get('/people', getPeople);
-router.get('/balances', getBalances);
-router.get('/settlements', getSettlements);
+// List all people
+router.get('/people', settlementsController.getPeople);
+
+// Get net balances (how much each person owes or is owed)
+router.get('/balances', settlementsController.getBalances);
+
+// Get settlement plan (who should pay whom)
+router.get('/settlements', settlementsController.getSettlements);
+
+// Record a manual settlement
+router.post('/settle', settlementsController.settleUp);
 
 module.exports = router;
