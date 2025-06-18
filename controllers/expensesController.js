@@ -1,7 +1,6 @@
 const db = require('../db');
 const { rupeesToPaise, paiseToRupees } = require('../utils/money');
 
-// Create or get person by name
 async function getOrCreatePerson(name) {
   const existing = await db.query('SELECT id FROM people WHERE name = $1', [name]);
   if (existing.rows.length > 0) return existing.rows[0].id;
@@ -10,59 +9,83 @@ async function getOrCreatePerson(name) {
   return insert.rows[0].id;
 }
 
-// Add a new expense
+// Add Expense
 exports.addExpense = async (req, res) => {
   try {
     const { amount, description, paid_by, split_type, shares } = req.body;
 
-    if (!amount || !description || !paid_by || !split_type || !shares) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!amount || !description || !paid_by || !split_type) {
+      return res.status(400).json({ message: 'Missing required fields' });
     }
 
     const amountRupees = parseFloat(amount);
     const payerId = await getOrCreatePerson(paid_by);
 
-    let totalShare = 0;
-    const sharesRupees = {};
-    for (const [name, value] of Object.entries(shares)) {
-      const share = parseFloat(value);
-      sharesRupees[name] = share;
-      totalShare += share;
-    }
+    let shareData = [];
+    if (split_type === 'equal') {
+      const people = Object.keys(shares);
+      const shareAmount = parseFloat((amountRupees / people.length).toFixed(2));
 
-    if (Math.abs(totalShare - amountRupees) > 0.01) {
-      return res.status(400).json({ message: "Shares do not match total amount" });
+      shareData = people.map(name => ({
+        name,
+        share: shareAmount
+      }));
+    } else if (split_type === 'exact' || split_type === 'percentage') {
+      let total = 0;
+      for (const [name, value] of Object.entries(shares)) {
+        const share = parseFloat(value);
+        shareData.push({ name, share });
+        total += share;
+      }
+
+      const expectedTotal = split_type === 'percentage'
+        ? 100
+        : parseFloat(amountRupees.toFixed(2));
+
+      if (Math.abs(total - expectedTotal) > 0.01) {
+        return res.status(400).json({ message: 'Shares do not match total amount' });
+      }
+
+      if (split_type === 'percentage') {
+        // convert percentage shares to rupee values
+        shareData = shareData.map(s => ({
+          name: s.name,
+          share: parseFloat(((s.share / 100) * amountRupees).toFixed(2))
+        }));
+      }
+    } else {
+      return res.status(400).json({ message: 'Invalid split_type' });
     }
 
     const result = await db.query(
       'INSERT INTO expenses (amount, description, paid_by, split_type) VALUES ($1, $2, $3, $4) RETURNING id',
-      [amountRupees, payerId, payerId, split_type] 
+      [rupeesToPaise(amountRupees), description, payerId, split_type]
     );
 
     const expenseId = result.rows[0].id;
 
-    for (const [name, share] of Object.entries(sharesRupees)) {
+    for (const { name, share } of shareData) {
       const personId = await getOrCreatePerson(name);
       await db.query(
         'INSERT INTO expense_shares (expense_id, person_id, share) VALUES ($1, $2, $3)',
-        [expenseId, personId, share]
+        [expenseId, personId, rupeesToPaise(share)]
       );
     }
 
-    res.json({ success: true, message: "Expense added", expense_id: expenseId });
+    res.json({ success: true, message: 'Expense added', expense_id: expenseId });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || "Unknown server error" });
+    res.status(500).json({ error: err.message || 'Unknown server error' });
   }
 };
 
-// Get all expenses
+// Get Expenses
 exports.getExpenses = async (req, res) => {
   try {
     const result = await db.query(`
       SELECT e.id, e.amount, e.description, p.name AS paid_by, e.split_type, e.created_at
       FROM expenses e
-      JOIN people p ON CAST(e.paid_by AS TEXT) = CAST(p.id AS TEXT)
+      JOIN people p ON e.paid_by = p.id
       ORDER BY e.created_at DESC
     `);
 
@@ -74,39 +97,38 @@ exports.getExpenses = async (req, res) => {
     res.json(expenses);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || "Unknown server error" });
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Update a specific expense
+// Update Expense
 exports.updateExpense = async (req, res) => {
   try {
     const id = req.params.id;
     const { amount, description, paid_by } = req.body;
 
     if (!amount || !description || !paid_by) {
-      return res.status(400).json({ message: "All fields required" });
+      return res.status(400).json({ message: 'All fields required' });
     }
 
     const payerId = await getOrCreatePerson(paid_by);
-
     const result = await db.query(
       'UPDATE expenses SET amount = $1, description = $2, paid_by = $3 WHERE id = $4 RETURNING *',
-      [parseFloat(amount), description, payerId, id]
+      [rupeesToPaise(parseFloat(amount)), description, payerId, id]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Expense not found" });
+      return res.status(404).json({ message: 'Expense not found' });
     }
 
-    res.json({ success: true, message: "Expense updated", data: result.rows[0] });
+    res.json({ success: true, message: 'Expense updated', data: result.rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || "Unknown server error" });
+    res.status(500).json({ error: err.message });
   }
 };
 
-// Delete an expense
+// Delete Expense
 exports.deleteExpense = async (req, res) => {
   try {
     const id = req.params.id;
@@ -115,12 +137,12 @@ exports.deleteExpense = async (req, res) => {
     const result = await db.query('DELETE FROM expenses WHERE id = $1 RETURNING *', [id]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Expense not found" });
+      return res.status(404).json({ message: 'Expense not found' });
     }
 
-    res.json({ success: true, message: "Expense deleted" });
+    res.json({ success: true, message: 'Expense deleted' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || "Unknown server error" });
+    res.status(500).json({ error: err.message });
   }
 };
