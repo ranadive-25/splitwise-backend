@@ -38,12 +38,13 @@ exports.getBalances = async (req, res) => {
     const balances = paidQuery.rows.map(row => {
       const paid = parseFloat(row.total_paid);
       const owed = shareMap[row.id] || 0;
+      const owedR = owed / 100;
 
       return {
         name: row.name,
         paid: paiseToRupees(paid),
-        owed: paiseToRupees(owed),
-        balance: paiseToRupees(paid - owed)
+        owed: paiseToRupees(owedR),
+        balance: paiseToRupees(owedR - paid)
       };
     });
 
