@@ -18,7 +18,7 @@ exports.addRecurringExpense = async (req, res) => {
     }
 
     const paidById = await getPersonId(paid_by);
-    const amountPaise = rupeesToPaise(amount);
+    const amountPaise = rupeesToPaise(parseFloat(amount));
 
     const result = await db.query(
       `INSERT INTO recurring_expenses (amount, description, paid_by, split_type, shares, frequency)
@@ -63,6 +63,7 @@ exports.getRecurringExpenses = async (req, res) => {
 
     res.json({ recurring });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -85,7 +86,7 @@ exports.runRecurringExpenses = async (req, res) => {
 
       for (const [name, value] of Object.entries(shares)) {
         const personId = await getPersonId(name);
-        const sharePaise = rupeesToPaise(value);
+        const sharePaise = rupeesToPaise(parseFloat(value)); // Convert to paise here
 
         await db.query(
           'INSERT INTO expense_shares (expense_id, person_id, share) VALUES ($1, $2, $3)',
