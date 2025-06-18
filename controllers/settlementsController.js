@@ -1,8 +1,7 @@
 const db = require('../db');
+const { paiseToRupees, rupeesToPaise } = require('../utils/money');
 
-const { paiseToRupees } = require('../utils/money');
-
-// Get People names
+// Get all people names
 exports.getPeople = async (req, res) => {
   try {
     const result = await db.query('SELECT name FROM people ORDER BY name');
@@ -13,49 +12,34 @@ exports.getPeople = async (req, res) => {
   }
 };
 
-
-// Get balance amounts of all people
+// Calculate net balances (paid - owed)
 exports.getBalances = async (req, res) => {
   try {
-    // 1. Get total paid by each person
     const paidQuery = await db.query(`
-      SELECT p.name, COALESCE(SUM(e.amount), 0) AS total_paid
+      SELECT p.id, p.name, COALESCE(SUM(e.amount), 0) AS total_paid
       FROM people p
-      LEFT JOIN expenses e ON CAST(p.id AS TEXT) = CAST(e.paid_by AS TEXT)
-      GROUP BY p.name
+      LEFT JOIN expenses e ON p.id = e.paid_by
+      GROUP BY p.id
     `);
 
-    // 2. Get total share for each person
     const shareQuery = await db.query(`
-      SELECT p.name, COALESCE(SUM(s.share), 0) AS total_share
+      SELECT p.id, p.name, COALESCE(SUM(s.share), 0) AS total_share
       FROM people p
       LEFT JOIN expense_shares s ON p.id = s.person_id
-      GROUP BY p.name
+      GROUP BY p.id
     `);
 
-    const paidMap = Object.fromEntries(
-      paidQuery.rows.map(r => [r.name, parseFloat(r.total_paid)])
-    );
-
-    const shareMap = Object.fromEntries(
-      shareQuery.rows.map(r => [r.name, parseFloat(r.total_share)])
-    );
-
-    const allPeople = new Set([...Object.keys(paidMap), ...Object.keys(shareMap)]);
-    const balances = [];
-
-    for (const name of allPeople) {
-      const paid = paidMap[name] || 0;
-      const share = shareMap[name] || 0;
-      const balance = paid - share;
-
-      balances.push({
-        name,
+    const balances = paidQuery.rows.map(row => {
+      const share = shareQuery.rows.find(s => s.id === row.id);
+      const paid = parseFloat(row.total_paid);
+      const owed = share ? parseFloat(share.total_share) : 0;
+      return {
+        name: row.name,
         paid: paiseToRupees(paid),
-        owed: paiseToRupees(share),
-        balance: paiseToRupees(balance)
-      });
-    }
+        owed: paiseToRupees(owed),
+        balance: paiseToRupees(paid - owed)
+      };
+    });
 
     res.json({ balances });
   } catch (err) {
@@ -64,12 +48,11 @@ exports.getBalances = async (req, res) => {
   }
 };
 
-// Get Settlement data
+// Who owes whom (auto settlement logic)
 exports.getSettlements = async (req, res) => {
   try {
-    // Get net balances first
     const balancesRes = await db.query(`
-      SELECT p.name,
+      SELECT p.id, p.name,
         COALESCE(SUM(e.amount), 0) AS total_paid,
         (SELECT COALESCE(SUM(s.share), 0)
          FROM expense_shares s WHERE s.person_id = p.id) AS total_share
@@ -83,17 +66,16 @@ exports.getSettlements = async (req, res) => {
       balance: parseInt(row.total_paid) - parseInt(row.total_share)
     }));
 
-    // Split into creditors and debtors
     let creditors = balances.filter(b => b.balance > 0).sort((a, b) => b.balance - a.balance);
     let debtors = balances.filter(b => b.balance < 0).sort((a, b) => a.balance - b.balance);
 
     const transactions = [];
-
     let i = 0, j = 0;
+
     while (i < debtors.length && j < creditors.length) {
-      let debtor = debtors[i];
-      let creditor = creditors[j];
-      let amount = Math.min(-debtor.balance, creditor.balance);
+      const debtor = debtors[i];
+      const creditor = creditors[j];
+      const amount = Math.min(-debtor.balance, creditor.balance);
 
       if (amount > 0) {
         transactions.push({
@@ -117,3 +99,34 @@ exports.getSettlements = async (req, res) => {
   }
 };
 
+// Manual settlement logging
+exports.settleUp = async (req, res) => {
+  try {
+    const { from, to, amount } = req.body;
+
+    if (!from || !to || !amount) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const payerRes = await db.query('SELECT id FROM people WHERE name = $1', [from]);
+    const receiverRes = await db.query('SELECT id FROM people WHERE name = $1', [to]);
+
+    if (payerRes.rows.length === 0 || receiverRes.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid person name(s)' });
+    }
+
+    const payerId = payerRes.rows[0].id;
+    const receiverId = receiverRes.rows[0].id;
+    const amountPaise = rupeesToPaise(parseFloat(amount));
+
+    await db.query(`
+      INSERT INTO settlements (payer_id, receiver_id, amount, settled_at)
+      VALUES ($1, $2, $3, NOW())
+    `, [payerId, receiverId, amountPaise]);
+
+    res.json({ success: true, message: 'Settlement recorded' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
