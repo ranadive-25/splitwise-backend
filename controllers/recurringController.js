@@ -118,7 +118,7 @@ exports.updateRecurringExpense = async (req, res) => {
        SET amount = $1, description = $2, paid_by = $3, split_type = $4, shares = $5, frequency = $6
        WHERE id = $7 RETURNING *`,
       [
-        rupeesToPaise(parseFloat(amount)),
+        parseFloat(amount), // ✅ Direct rupee value
         description,
         paidBy.rows[0].id,
         split_type,
@@ -138,7 +138,6 @@ exports.updateRecurringExpense = async (req, res) => {
   }
 };
 
-
 exports.deleteRecurringExpense = async (req, res) => {
   try {
     const id = req.params.id;
@@ -154,4 +153,5 @@ exports.deleteRecurringExpense = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 
